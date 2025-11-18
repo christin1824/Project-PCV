@@ -1,6 +1,8 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import tkinter as tk
+from PIL import Image, ImageTk
 
 
 class PoseHandFaceTracker:
@@ -193,6 +195,80 @@ class PoseHandFaceTracker:
         cv2.destroyAllWindows()
 
 
+class TkinterTrackerApp:
+    def __init__(self, tracker):
+        self.tracker = tracker
+        self.cap = cv2.VideoCapture(0)
+        if not self.cap.isOpened():
+            raise RuntimeError("❌ Tidak bisa membuka kamera. Pastikan kamera terhubung.")
+
+        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 640)
+        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 480)
+
+        # Setup window
+        self.root = tk.Tk()
+        self.root.title("MediaPipe Tracker - Tkinter")
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        main = tk.Frame(self.root, padx=10, pady=10)
+        main.pack(expand=True, fill="both")
+
+        tk.Label(main, text="Webcam + Tracking", font=("Arial", 12, "bold")).grid(row=0, column=0, pady=6)
+        tk.Label(main, text="Skeleton + Face Mesh", font=("Arial", 12, "bold")).grid(row=0, column=1, pady=6)
+
+        self.canvas1 = tk.Canvas(main, width=self.width, height=self.height, bg="black")
+        self.canvas1.grid(row=1, column=0, padx=6, pady=6)
+        self.canvas2 = tk.Canvas(main, width=self.width, height=self.height, bg="black")
+        self.canvas2.grid(row=1, column=1, padx=6, pady=6)
+
+        self.photo1 = None
+        self.photo2 = None
+
+        self.delay = 15
+        self.update()  # start update loop
+        self.root.mainloop()
+
+    def update(self):
+        ret, frame = self.cap.read()
+        if ret:
+            frame = cv2.flip(frame, 1)
+
+            # detections
+            pose_keypoints = self.tracker.detect_pose(frame)
+            hand_keypoints = self.tracker.detect_hands(frame)
+            faces = self.tracker.detect_faces(frame)
+
+            # draw on original frame
+            self.tracker.draw_pose(frame, pose_keypoints)
+            self.tracker.draw_hands(frame, hand_keypoints)
+            self.tracker.draw_faces(frame, faces)
+
+            # prepare skeleton-only blank
+            blank = np.zeros_like(frame)
+            self.tracker.draw_pose_on_blank(blank, pose_keypoints)
+            self.tracker.draw_hands_on_blank(blank, hand_keypoints)
+            self.tracker.draw_faces_on_blank(blank, faces)
+
+            # convert BGR->RGB and to ImageTk
+            img1 = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img2 = cv2.cvtColor(blank, cv2.COLOR_BGR2RGB)
+            im1 = Image.fromarray(img1)
+            im2 = Image.fromarray(img2)
+            self.photo1 = ImageTk.PhotoImage(image=im1)
+            self.photo2 = ImageTk.PhotoImage(image=im2)
+
+            # update canvases
+            self.canvas1.create_image(0, 0, image=self.photo1, anchor='nw')
+            self.canvas2.create_image(0, 0, image=self.photo2, anchor='nw')
+
+        self.root.after(self.delay, self.update)
+
+    def on_close(self):
+        if hasattr(self, "cap") and self.cap.isOpened():
+            self.cap.release()
+        self.root.destroy()
+
+
 if __name__ == "__main__":
     tracker = PoseHandFaceTracker()
-    tracker.run()
+    app = TkinterTrackerApp(tracker)
