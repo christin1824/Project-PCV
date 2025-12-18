@@ -9,6 +9,9 @@ Aplikasi menampilkan dua windows:
 * **Kanan**: Avatar animasi yang mengikuti gerakan tubuh 
 
 ---
+## Video Demo
+
+Berikut merupakan video demo vtuber : https://drive.google.com/file/d/17j6cfuJ04dZ1s7ZGbjQ7qD6UbnBeW1jG/view?usp=sharing
 
 ## Konsep Utama (Tracking & Rendering)
 
