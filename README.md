@@ -13,6 +13,8 @@ Aplikasi menampilkan dua windows:
 
 Berikut merupakan video demo vtuber : https://drive.google.com/file/d/17j6cfuJ04dZ1s7ZGbjQ7qD6UbnBeW1jG/view?usp=sharing
 
+---
+
 ## Konsep Utama (Tracking & Rendering)
 
 Hampir semua tubuh, wajah, dan rambut avatar digambar memakai kode primitif OpenCV (lingkaran, garis, poligon). Hanya dua file aset yang digunakan sebagai *overlay* pakaian. Aplikasi menggabungkan 3 modul utama MediaPipe:
