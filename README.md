@@ -1,4 +1,4 @@
-# Laporan Project Akhir PCV Vtuber
+# Laporan Project Akhir PCV Vtuber Dengan Menggunakan Shape Untuk Animasi
 
 ## Pendahuluan
 
@@ -169,3 +169,253 @@ python main.py
 
 ## Kesimpulan 
 Aplikasi VTuber 2D ini berhasil menggabungkan MediaPipe (Pose, Face Mesh, dan Hand Tracking) dengan OpenCV untuk membangun avatar kartun real-time yang responsif dan menarik. Meskipun sebagian besar avatar digambar menggunakan primitive shapes, aplikasi ini bisa menjadi fondasi awal untuk proyek VTuber lebih kompleks seperti model avatar 3D.
+
+---
+
+# Laporan Project Akhir PCV Vtuber Dengan Menggunakan Vtube Studio Untuk Animasi
+
+## Pendahuluan
+
+Project ini merupakan aplikasi **VTuber Face Tracking Real-Time** yang mengintegrasikan **MediaPipe Face Mesh** dengan **VTube Studio** untuk menggerakkan avatar 2D secara langsung berdasarkan ekspresi dan pergerakan wajah pengguna. Sistem ini berfungsi sebagai **plugin eksternal face tracker**, di mana data hasil deteksi wajah dari webcam diproses menggunakan MediaPipe, kemudian dikirimkan ke **VTube Studio melalui VTube Studio Public API berbasis WebSocket**.
+
+Berbeda dengan proyek VTuber sebelumnya yang menggambar avatar menggunakan **primitive shapes OpenCV**, pada project ini seluruh proses animasi dan rendering avatar ditangani sepenuhnya oleh **VTube Studio**, sementara aplikasi Python hanya bertugas melakukan:
+
+- Tracking wajah  
+- Perhitungan parameter ekspresi  
+- Pengiriman data parameter ke model Live2D di VTube Studio  
+
+Aplikasi menampilkan satu jendela utama berupa:
+
+- GUI Webcam + Face Mesh Tracking (Tkinter)  
+- Avatar Live2D ditampilkan terpisah di aplikasi VTube Studio  
+
+---
+
+## Video Demo
+
+Berikut merupakan video demo : https://drive.google.com/file/d/17j6cfuJ04dZ1s7ZGbjQ7qD6UbnBeW1jG/view?usp=sharing  
+
+---
+
+## Konsep Utama (Tracking & Parameter Injection)
+
+Konsep utama project ini adalah mengonversi **landmark wajah MediaPipe** menjadi **parameter numerik** yang sesuai dengan parameter standar **VTube Studio**, lalu mengirimkannya secara *real-time* melalui **WebSocket API**.
+
+Sistem terdiri dari tiga komponen utama:
+
+- Face Tracking (MediaPipe)  
+- Parameter Processing & Smoothing  
+- Parameter Injection ke VTube Studio  
+
+---
+
+## 1. Face Tracking (MediaPipe Face Mesh)
+
+Aplikasi menggunakan **MediaPipe Face Mesh** untuk mendeteksi ratusan landmark wajah secara real-time. Landmark ini digunakan untuk menghitung:
+
+- Rotasi Kepala (X, Y, Z)  
+- Bukaan Mulut  
+- Keterbukaan Mata Kiri & Kanan  
+
+MediaPipe dipilih karena:
+
+- Ringan dan real-time  
+- Stabil untuk single-face tracking  
+- Cocok untuk aplikasi VTuber  
+
+---
+
+## 2. Perhitungan Parameter Wajah
+
+### a. Rotasi Kepala (Head Rotation)
+
+Rotasi kepala dihitung menggunakan beberapa landmark utama:
+
+- Ujung hidung (*nose tip*)  
+- Jembatan hidung  
+- Sudut mata kiri dan kanan  
+
+Parameter yang dihasilkan:
+
+- **Head X** → Gerakan menoleh kiri/kanan  
+- **Head Y** → Gerakan menunduk/menengadah  
+- **Head Z** → Kemiringan kepala (*tilt*)  
+
+Nilai dinormalisasi ke rentang **-1 hingga 1**, kemudian diskalakan ke rentang **-30 sampai 30** agar sesuai dengan standar VTube Studio:
+- FaceAngleX
+- FaceAngleY
+- FaceAngleZ
+
+
+---
+
+### b. Bukaan Mulut (Mouth Open)
+
+Bukaan mulut dihitung dari jarak vertikal antara:
+
+- Landmark bibir atas  
+- Landmark bibir bawah  
+
+Nilai ini dinormalisasi ke rentang **0 – 1** dan dipetakan ke parameter:
+- MouthOpen
+
+
+Semakin besar jarak bibir, semakin terbuka mulut avatar di VTube Studio.
+
+---
+
+### c. Keterbukaan Mata (Eye Open)
+
+Untuk setiap mata, sistem menghitung jarak vertikal antara:
+
+- Kelopak mata atas  
+- Kelopak mata bawah  
+
+Parameter yang dikirim:
+- EyeOpenLeft
+- EyeOpenRight
+
+
+Nilai ini memungkinkan avatar:
+
+- Berkedip  
+- Menutup mata  
+- Membuka mata secara natural  
+
+---
+
+## 3. Smoothing dan Stabilitas Gerakan
+
+Agar animasi avatar terlihat halus dan tidak bergetar, digunakan metode **Exponential Moving Average (EMA)**:
+```
+smoothed = old_value * (1 - alpha) + new_value * alpha
+```
+
+
+Smoothing diterapkan pada:
+
+- Rotasi kepala  
+- Bukaan mulut  
+- Bukaan mata  
+
+Hal ini membuat pergerakan avatar di VTube Studio terlihat lebih natural dan stabil.
+
+---
+
+## Integrasi dengan VTube Studio
+
+### 1. Koneksi WebSocket
+
+Aplikasi terhubung ke:
+```
+ws://localhost:8001
+```
+
+Menggunakan **VTube Studio Public API**, dengan proses:
+
+- Authentication Token Request  
+- Authentication Request  
+- Parameter Injection  
+
+---
+
+### 2. Mapping Parameter
+
+| Parameter MediaPipe | Parameter VTube Studio |
+|--------------------|------------------------|
+| Head X | FaceAngleX |
+| Head Y | FaceAngleY |
+| Head Z | FaceAngleZ |
+| Mouth Open | MouthOpen |
+| Eye Left | EyeOpenLeft |
+| Eye Right | EyeOpenRight |
+
+Parameter dikirim menggunakan:
+```
+InjectParameterDataRequest
+```
+
+---
+
+### 3. Heartbeat & Reconnect System
+
+Aplikasi dilengkapi dengan:
+
+- Heartbeat otomatis setiap 5 detik  
+- Auto reconnect jika koneksi terputus  
+- Monitoring status koneksi di GUI  
+
+Fitur ini memastikan aplikasi tetap stabil saat digunakan dalam sesi VTuber yang panjang.
+
+---
+
+## Antarmuka Pengguna (GUI)
+
+GUI dibuat menggunakan **Tkinter**, dengan fitur:
+
+- Tampilan webcam real-time  
+- Visualisasi Face Mesh MediaPipe  
+- Status koneksi ke VTube Studio  
+- Informasi parameter yang sedang aktif  
+
+GUI berfungsi sebagai alat monitoring, sementara animasi avatar ditampilkan langsung di VTube Studio.
+
+---
+
+## Teknologi dan Dependensi
+
+| Kategori | Teknologi | Fungsi |
+|--------|----------|-------|
+| Face Tracking | MediaPipe Face Mesh | Deteksi landmark wajah |
+| Computer Vision | OpenCV | Capture webcam & visualisasi |
+| GUI | Tkinter | Antarmuka monitoring |
+| API Communication | WebSocket | Komunikasi dengan VTube Studio |
+| Image Processing | PIL (Pillow) | Konversi frame ke Tkinter |
+| Math Processing | Python Math | Normalisasi & rotasi |
+
+---
+
+## Cara Instalasi dan Eksekusi
+
+### 1. Prasyarat
+
+- Python  
+- Webcam  
+- VTube Studio (Running & Model Loaded)  
+
+---
+
+### 2. Instalasi Dependensi
+
+```bash
+pip install opencv-python mediapipe numpy pillow websocket-client
+```
+### 3. Menjalankan Program
+
+- Buka VTube Studio
+- Aktifkan Allow API Access
+- Jalankan program:
+  ```
+  python barukepala.py
+  ```
+- Izinkan plugin saat pop-up autentikasi muncul di VTube Studio
+
+---
+
+## Limitasi Aplikasi
+- Tidak ada Lip-Sync Audio : Bukaan mulut hanya berbasis visual, belum terintegrasi suara.
+- Ekspresi Terbatas Parameter Default : Bergantung pada parameter yang tersedia di model Live2D.
+- Tracking Masih 2D : Belum menggunakan solvePnP untuk rotasi 3D yang presisi.
+- Single Face Only : Sistem hanya mendukung satu wajah.
+
+## Rencana Pengembangan
+- Integrasi Audio-Based Lip Sync
+- Implementasi Hand Pose
+- Support Custom Parameter Live2D
+- Gesture-based expression (alis, senyum, marah)
+---
+
+## Kesimpulan
+Project VTuber ini berhasil mengimplementasikan sistem Face Tracking real-time menggunakan MediaPipe yang terintegrasi langsung dengan VTube Studio melalui WebSocket API. Dengan memisahkan proses tracking dan rendering, aplikasi ini mampu memanfaatkan kualitas animasi Live2D secara maksimal, sekaligus mempertahankan fleksibilitas pengolahan data wajah di sisi Python.
+
+Proyek ini menjadi fondasi yang kuat untuk pengembangan sistem VTuber profesional, baik untuk kebutuhan streaming, virtual presenter, maupun penelitian lanjutan di bidang Computer Vision dan Human–Computer Interaction.
